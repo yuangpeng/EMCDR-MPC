@@ -1,7 +1,7 @@
 import os
 import sys
 
-from utils import set_seed
+from util import set_seed
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from transformers import get_linear_schedule_with_warmup
 
 
-from model.train import MyDataSet
+# from model.train import MyDataSet
 from model import Encoder,Decoder
 import config
 
@@ -66,11 +66,13 @@ class Pipeline:
                 break
 
     def forward(self):
-        trainDataSet = MyDataSet(filename1)
-        testDataSet = MyDataSet(filename1)
+        # trainDataSet = MyDataSet(filename1)
+        # testDataSet = MyDataSet(filename1)
+        #
+        # self.trainLoader = DataLoader(trainDataSet,16,shuffle=True)
+        # self.testLoader= DataLoader(testDataSet, 16, shuffle=True)
 
-        self.trainLoader = DataLoader(trainDataSet,16,shuffle=True)
-        self.testLoader= DataLoader(testDataSet, 16, shuffle=True)
+        self.train_data = torch.rand([8, 4, config.d_model], requires_grad=False).to(config.device)
 
         params = []
         # 定义优化器、损失函数等

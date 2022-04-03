@@ -1,5 +1,8 @@
 import config
 import torch
+import numpy as np
+import os
+import random
 
 def init_lstm_wt(lstm):
     for name, _ in lstm.named_parameters():
@@ -25,3 +28,14 @@ def init_linear_wt(linear):
 def init_wt_normal(wt):
     torch.nn.init.xavier_normal_(wt)
 
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)
+    random.seed(seed)
+
+    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.benchmark = False
+    os.environ['PYTHONHASHSEED'] = str(seed)
