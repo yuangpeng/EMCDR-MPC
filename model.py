@@ -149,6 +149,18 @@ class Decoder(torch.nn.Module):
 
         return X
 
+class Transformer(torch.nn.Module):
+    def __init__(self):
+        super(Transformer, self).__init__()
+        self.encoder = Encoder().to(config.device)
+        self.decoder = Decoder().to(config.device)
+
+    def forward(self,X):
+        X = self.encoder(X)
+        X = self.decoder(X, self.encoder.W_Ks[config.multi_heads * (config.num_layers_encoder - 1):], self.encoder.W_Vs[config.multi_heads * (config.num_layers_encoder - 1):])
+        return X
+
+
 test_date = torch.rand([8, 4, config.d_model], requires_grad=False).to(config.device)
 encoder = Encoder().to(config.device)
 X = encoder(test_date)
@@ -156,3 +168,4 @@ print(X.size())
 decoder = Decoder().to(config.device)
 X = decoder(X, encoder.W_Ks[config.multi_heads * (config.num_layers_encoder - 1):], encoder.W_Vs[config.multi_heads * (config.num_layers_encoder - 1):])
 print(X.size())
+
