@@ -27,7 +27,11 @@ def init_linear_wt(linear):
 
 def init_wt_normal(wt):
     torch.nn.init.xavier_normal_(wt)
-
+    
+def init_cnn_wt(cnn):
+    torch.nn.init.xavier_normal_(cnn.weight)
+    if cnn.bias is not None:
+        cnn.bias.data.normal_(std=config.trunc_norm_init_std)
 
 def set_seed(seed):
     torch.manual_seed(seed)
