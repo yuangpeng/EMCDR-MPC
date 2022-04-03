@@ -1,6 +1,8 @@
-import numpy as np
 import pandas as pd
+import torch
+import numpy as np
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def load_data(file_path):
     """ import data
@@ -13,7 +15,7 @@ def load_data(file_path):
     return ui_rating.values
 
 
-def matrix_factorization(rating_matrix, k, learning_rate, beta, training_epochs, display_step=10):
+def matrix_factorization(rating_matrix, k, learning_rate, beta, training_epochs, display_step=100):
     """ matrix factorization using gradient descent
     input:
         data: rating matrix
@@ -26,54 +28,39 @@ def matrix_factorization(rating_matrix, k, learning_rate, beta, training_epochs,
     """
     m, n = np.shape(rating_matrix)
 
-    # 1.初始化输入
-    R = tf.placeholder(tf.float32, [m, n])
+    # initialize feature matrix of U and V
+    U = torch.tensor(np.random.normal(0, 0.1, size=(m, k)), requires_grad=True, dtype=torch.float, device=device)
+    V = torch.tensor(np.random.normal(0, 0.1, size=(n, k)), requires_grad=True, dtype=torch.float, device=device)
 
-    # 2.初始化U和V
-    U = tf.get_variable("U", [m, k], initializer=tf.random_normal_initializer(0, 0.1))
-    V = tf.get_variable("V", [n, k], initializer=tf.random_normal_initializer(0, 0.1))
+    for epoch in range(training_epochs):
+        l2_reg = beta * (torch.pow(U, 2).sum() + torch.pow(V, 2).sum()).to(device)
+        criterion = torch.nn.MSELoss(reduction='mean')
+        loss = criterion(torch.matmul(U, torch.transpose(V, 0, 1)), torch.tensor(rating_matrix, dtype=torch.float, device=device)) + l2_reg
+        loss.backward()
 
-    # 3.构建模型
-    pred = tf.matmul(U, tf.transpose(V))
-    regU = layers.l2_regularizer(beta)(U)
-    regV = layers.l2_regularizer(beta)(tf.transpose(V))
-    cost = tf.reduce_mean(tf.square(tf.subtract(R, pred))) + regU + regV
-    # cost = tf.reduce_mean(tf.square(tf.subtract(R, pred)))
-    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
+        if (epoch + 1) % display_step == 0:
+            print(f'Epoch: {epoch + 1}, cost = {loss}')
 
-    init = tf.global_variables_initializer()
+        if (epoch + 1) % 50000 == 0:
+            torch.save(U, f'./UI/U_{epoch + 1}.pt')
+            torch.save(V, f'./UI/V_{epoch + 1}.pt')
 
-    # 4.进行训练
-    with tf.Session() as sess:
-        # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-        sess.run(init)
+        with torch.no_grad():
+            U -= learning_rate * U.grad
+            V -= learning_rate * V.grad
 
-        for epoch in range(training_epochs):
-            avg_cost = 0
-            # total_batch = int(m / batch_size)
-            # for i in range(total_batch):
-            #     batch = tf.train.shuffle_batch([data], batch_size)
-            sess.run(train_step, feed_dict={R: rating_matrix})
+            U.grad = None
+            V.grad = None
 
-            # 打印cost
-            if (epoch + 1) % display_step == 0:
-                avg_cost = sess.run(cost, feed_dict={R: rating_matrix})
-                print("Epoch:", '%04d' % (epoch + 1), "cost=", "{:.9f}".format(avg_cost))
-
-        # 打印变量
-        variable_names = [v.name for v in tf.trainable_variables()]
-        values = sess.run(variable_names)
-        for k, v in zip(variable_names, values):
-            print("Variable:", k)
-            print("Shape: ", v.shape)
-            print(v)
-
-        # 保存模型
-        saver = tf.train.Saver()
-        saver.save(sess, "model/mf_t/t")
-        print("Optimization Finished!")
+    print('Variable: U')
+    print(f'Shape: {U.shape}')
+    print(U)
+    print('Variable: V')
+    print(f'Shape: {V.shape}')
+    print(V)
+    print("Optimization Finished!")
 
 
 if __name__ == "__main__":
     data = load_data("./data/t_rate.csv")
-    matrix_factorization(data, 5, 0.0002, 0.02, 50000, 1000)
+    matrix_factorization(data, 5, 0.0002, 0.02, 400000, 1000)
