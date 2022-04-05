@@ -112,6 +112,23 @@ class Decoder(torch.nn.Module):
             util.init_linear_wt(self.W_forward0[layer])
             util.init_linear_wt(self.W_forward1[layer])
 
+        self.convs = torch.nn.ModuleList(
+            [torch.nn.Conv2d(1, config.d_model, (k, config.d_model)) for k in config.filter_sizes])
+        for cnn in self.convs:
+            util.init_cnn_wt(cnn)
+
+        self.dropout = torch.nn.Dropout(config.dropout)
+
+        self.linear = torch.nn.Linear(len(config.filter_sizes) * config.d_model, config.d_model)
+        util.init_linear_wt(self.linear)
+
+    def conv_and_pool(self, x, conv):
+        x = F.relu(conv(x)) # [batch_size, num_filters, seq_len-k+1, 1]
+        x = x.squeeze(3) # [batch_size, num_filters, seq_len-k+1]
+        x = F.max_pool1d(x, kernel_size=x.size(2)) # [batch_size, num_filters, 1]
+        x = x.squeeze(2) # [batch_size, num_filters]
+        return x
+
     def forward(self, X, W_Ks, W_Vs):
         # X.shape = [batch_size, seq_len, config.d_model]
         batch_size, seq_len, d_model = X.size()
@@ -147,19 +164,15 @@ class Decoder(torch.nn.Module):
             residua_outcome1 = LN(residua_outcome1)
             X = self.W_residua[layer](residua_outcome1)
 
+        # X.shape = [batch_size, seq_len, d_model]
+        X = torch.unsqueeze(X, dim=1)
+        X = torch.cat([self.conv_and_pool(X, conv) for conv in self.convs], 1) # [batch_size, 2 * d_model]
+
+        X = self.dropout(X)
+
+        X = self.linear(X)
+
         return X
-
-class Transformer(torch.nn.Module):
-    def __init__(self):
-        super(Transformer, self).__init__()
-        self.encoder = Encoder().to(config.device)
-        self.decoder = Decoder().to(config.device)
-
-    def forward(self,X):
-        X = self.encoder(X)
-        X = self.decoder(X, self.encoder.W_Ks[config.multi_heads * (config.num_layers_encoder - 1):], self.encoder.W_Vs[config.multi_heads * (config.num_layers_encoder - 1):])
-        return X
-
 
 test_date = torch.rand([8, 4, config.d_model], requires_grad=False).to(config.device)
 encoder = Encoder().to(config.device)
@@ -168,4 +181,3 @@ print(X.size())
 decoder = Decoder().to(config.device)
 X = decoder(X, encoder.W_Ks[config.multi_heads * (config.num_layers_encoder - 1):], encoder.W_Vs[config.multi_heads * (config.num_layers_encoder - 1):])
 print(X.size())
-
